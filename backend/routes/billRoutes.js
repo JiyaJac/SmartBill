@@ -1,62 +1,27 @@
 const express = require("express");
 const router = express.Router();
-
 const multer = require("multer");
 
 const {
     addBill,
-    uploadBill,
+    scanBill,
     getPersonalBills,
     getFamilyBills,
     getBillsByHousehold,
     markAsPaid
 } = require("../controllers/billController");
 
-const upload = multer({
-    dest: "uploads/"
-});
+// ← memoryStorage so req.file.buffer is populated for Claude
+const upload = multer({ storage: multer.memoryStorage() });
 
-/*
-    Add Bill
-*/
 router.post("/add", addBill);
 
-/*
-    Upload Bill
-*/
-router.post(
-    "/upload",
-    upload.single("bill"),
-    uploadBill
-);
+// ← route is now /scan, field name matches frontend's "billImage"
+router.post("/scan", upload.single("billImage"), scanBill);
 
-/*
-    Personal Bills
-*/
-router.get(
-    "/personal/:userId",
-    getPersonalBills
-);
-
-/*
-    Family Bills
-*/
-router.get(
-    "/family/:householdId",
-    getFamilyBills
-);
-
-/*
-    All Bills In Household
-*/
-router.get(
-    "/household/:id",
-    getBillsByHousehold
-);
-
-/*
-    Mark Bill Paid
-*/
+router.get("/personal/:userId", getPersonalBills);
+router.get("/family/:householdId", getFamilyBills);
+router.get("/household/:id", getBillsByHousehold);
 router.patch("/pay/:id", markAsPaid);
 
 module.exports = router;

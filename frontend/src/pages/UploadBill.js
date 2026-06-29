@@ -12,6 +12,7 @@ function UploadBill() {
 
   const [file, setFile] = useState(null);
   const [billData, setBillData] = useState(null);
+  const [scanning, setScanning] = useState(false);
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
   const [dueDate, setDueDate] = useState("");
@@ -20,25 +21,33 @@ function UploadBill() {
   const [success, setSuccess] = useState("");
 
   const handleUpload = async () => {
-    if (!file) {
-      setError("Please select a file");
-      return;
-    }
+    if (!file) { setError("Please select a file"); return; }
+    setScanning(true);
+    setError("");
 
     const formData = new FormData();
-    formData.append("bill", file);
+    formData.append("billImage", file);
 
     try {
       const response = await axios.post(
-        "http://localhost:5000/api/bills/upload",
+        "http://localhost:5000/api/bills/scan",
         formData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
-      setBillData(response.data);
+
+      const extracted = response.data.extracted;
+      setBillData(extracted);
+
+      if (extracted.title)    setTitle(extracted.title);
+      if (extracted.amount)   setAmount(extracted.amount);
+      if (extracted.due_date) setDueDate(extracted.due_date);
+
       setError("");
     } catch (err) {
       console.error(err);
       setError("Upload failed");
+    } finally {
+      setScanning(false);
     }
   };
 
@@ -46,15 +55,8 @@ function UploadBill() {
     setError("");
     setSuccess("");
 
-    if (!title || !amount || !dueDate) {
-      setError("Please fill in all fields.");
-      return;
-    }
-
-    if (!household_id) {
-      setError("No active household selected.");
-      return;
-    }
+    if (!title || !amount || !dueDate) { setError("Please fill in all fields."); return; }
+    if (!household_id) { setError("No active household selected."); return; }
 
     try {
       const response = await axios.post(
@@ -66,7 +68,7 @@ function UploadBill() {
           amount,
           due_date: dueDate,
           bill_scope: billScope,
-          added_by: user?.username
+          added_by: user?.username,
         }
       );
 
@@ -75,7 +77,8 @@ function UploadBill() {
       setAmount("");
       setDueDate("");
       setBillScope("personal");
-
+      setBillData(null);
+      setFile(null);
     } catch (err) {
       console.error(err);
       setError("Failed to add bill");
@@ -96,7 +99,8 @@ function UploadBill() {
         </div>
 
         <div className="upload-grid">
-          {/* Upload */}
+
+          {/* ── Card 1: Upload & Scan ── */}
           <div className="card">
             <h3>Upload Bill File</h3>
 
@@ -105,7 +109,12 @@ function UploadBill() {
                 <input
                   type="file"
                   className="file-input"
-                  onChange={(e) => setFile(e.target.files[0])}
+                  accept="image/*"
+                  onChange={(e) => {
+                    setFile(e.target.files[0]);
+                    setBillData(null);
+                    setError("");
+                  }}
                 />
                 <span className="file-cta">Choose File</span>
               </label>
@@ -114,36 +123,39 @@ function UploadBill() {
               </div>
             </div>
 
-            <button className="btn primary" onClick={handleUpload}>
-              Upload and Extract
+            <button
+              className="btn primary"
+              onClick={handleUpload}
+              disabled={scanning}
+            >
+              {scanning ? "Scanning..." : "Upload and Extract"}
             </button>
 
             {billData && (
               <div className="extracted">
                 <h4>Extracted Information</h4>
+                <p style={{ fontSize: "12px", color: "#94a3b8", margin: "0 0 10px" }}>
+                  Review and edit the fields on the right before adding.
+                </p>
                 <div className="extracted-grid">
                   <div>
-                    <strong>Bill Type:</strong>
-                    <div>{billData.billType}</div>
+                    <strong>Title:</strong>
+                    <div>{billData.title || "Not detected"}</div>
                   </div>
                   <div>
                     <strong>Amount:</strong>
-                    <div>₹{billData.amount}</div>
+                    <div>{billData.amount ? `₹${billData.amount}` : "Not detected"}</div>
                   </div>
                   <div>
                     <strong>Due Date:</strong>
-                    <div>{billData.dueDate}</div>
-                  </div>
-                  <div>
-                    <strong>Consumer No.:</strong>
-                    <div>{billData.consumerNumber}</div>
+                    <div>{billData.due_date || "Not detected"}</div>
                   </div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Manual Add */}
+          {/* ── Card 2: Form ── */}
           <div className="card">
             <h3>Add Bill Manually</h3>
 
@@ -205,6 +217,7 @@ function UploadBill() {
               </button>
             </div>
           </div>
+
         </div>
       </div>
     </Layout>
